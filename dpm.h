@@ -50,7 +50,7 @@ const double finc = 1.1;
 const double fdec = 0.5;
 const double falpha = 0.99;
 
-const int NSKIP = 20000;
+const int NSKIP = 5000;
 const int NMIN = 10;
 const int NNEGMAX = 1000;
 const int NDELAY = 20;
@@ -156,6 +156,9 @@ public:
 	double getF(int gi, int d) { return F[NDIM * gi + d]; };
 	double getU() { return U; };
 
+	// get stress info
+	double getstress(int d) { return stress.at(d); };
+
 	// boundary variables
 	double getL(int d) { return L.at(d); };
 	bool getpbc(int d) { return pbc.at(d); };
@@ -164,6 +167,7 @@ public:
 	int gindex(int ci, int vi);
 	void cindices(int &ci, int &vi, int gi);
 	double area(int ci);
+	double area(int ci, double gamma);
 	double perimeter(int ci);
 	void com2D(int ci, double &cx, double &cy);
 	double vertexPackingFraction2D();
@@ -216,6 +220,7 @@ public:
 	void resetForcesAndEnergy();
 	void shapeForces2D();
 	void vertexRepulsiveForces2D();
+	void vertexRepulsiveForces2D(double gamma);
 	void vertexAttractiveForces2D();
 
 	// force updates
@@ -232,6 +237,7 @@ public:
 	void vertexCompress2Target2D(dpmMemFn forceCall, double Ftol, double dt0, double phi0Target, double dphi0);
 	void vertexJamming2D(dpmMemFn forceCall, double Ftol, double Ptol, double dt0, double dphi0, bool plotCompression);
 	void vertexAnneal2Jam2D(dpmMemFn forceCall, double Ftol, double Ptol, double dt0, double dphi0, double T0, double trun, bool plotCompression);
+	void vertexEnthalpyMin(dpmMemFn forceCall, double Ftol, double dPtol, double P0, double dt0, bool plotCompression);
 
 	// hessian methods
 	// note: dynamical matrix contribution is always M = H - S

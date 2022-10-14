@@ -48,11 +48,11 @@ tumor2D::tumor2D(string &inputFileStr,int seed) : dpm(2) {
     // local variables
     int nvtmp, ci, vi, i;
     double val;
-    double lxtmp, lytmp;
+    double lxtmp, lytmp, wpostmp;
     double s1, s2, s3;
     double wp1, wp2;
-    double a0tmp, l0tmp, t0tmp;
-    double xtmp, ytmp, rtmp;
+    double a0tmp, psitmp, l0tmp, t0tmp;
+    double xtmp, ytmp, rtmp, vxtmp, vytmp;
     string inputStr;
 
     // LINE 1: should be NEWFR
@@ -91,12 +91,19 @@ tumor2D::tumor2D(string &inputFileStr,int seed) : dpm(2) {
 
     // initialize box lengths
     getline(inputobj, inputStr);
-    sscanf(inputStr.c_str(),"BOXSZ %lf %lf",&lxtmp,&lytmp);
+    sscanf(inputStr.c_str(),"BOXSZ %lf %lf %lf",&lxtmp,&lytmp,&wpostmp);
     //cout << "\t ** " << inputStr << endl;
-
+    
+    
+    if (wpostmp!=0) {
+        if (abs(log10(abs(wpostmp)))>3 || abs(wpostmp)>2) {
+            wpostmp = 0;
+        }
+    }
+    
     L.at(0) = lxtmp;
     L.at(1) = lytmp;
-
+    wpos = wpostmp;
     // initialize stress
     getline(inputobj, inputStr);
     sscanf(inputStr.c_str(),"STRSS %lf %lf %lf",&s1,&s2,&s3);
@@ -114,7 +121,6 @@ tumor2D::tumor2D(string &inputFileStr,int seed) : dpm(2) {
     wpress.resize(2);
     wpress.at(0) = wp1;
     wpress.at(1) = wp2;
-    wpos = 0;
     
     // szList and nv (keep track of global vertex indices)
     nv.resize(NCELLS);
@@ -144,8 +150,10 @@ tumor2D::tumor2D(string &inputFileStr,int seed) : dpm(2) {
     for (ci=0; ci<NCELLS; ci++){
         // first parse cell info
         getline(inputobj, inputStr);
-        if (ci < tN)
-            sscanf(inputStr.c_str(),"CINFO %d %*d %*d %lf %*lf %*lf %*lf %*f",&nvtmp,&a0tmp);
+        if (ci < tN){
+            sscanf(inputStr.c_str(),"CINFO %d %*d %*d %lf %*lf %*lf %lf %*f",&nvtmp,&a0tmp,&psitmp);
+            psi.at(ci) = psitmp;
+        }
         else
             sscanf(inputStr.c_str(),"CINFO %d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf",&nvtmp,&a0tmp);
 
@@ -155,7 +163,6 @@ tumor2D::tumor2D(string &inputFileStr,int seed) : dpm(2) {
         // store in vectors
         nv.at(ci) = nvtmp;
         a0.at(ci) = a0tmp;
-
         // update NVTOT
         NVTOT += nvtmp;
 
@@ -167,10 +174,7 @@ tumor2D::tumor2D(string &inputFileStr,int seed) : dpm(2) {
         for (vi=0; vi<nvtmp; vi++){
             // parse vertex coordinate info
             getline(inputobj, inputStr);
-            sscanf(inputStr.c_str(),"VINFO %*d %*d %lf %lf %lf %lf %lf %*lf %*lf",&xtmp,&ytmp,&rtmp,&l0tmp,&t0tmp);
-
-            // print to console
-            //cout << "\t ** " << inputStr << endl;
+            sscanf(inputStr.c_str(),"VINFO %*d %*d %lf %lf %lf %lf %lf %lf %lf",&xtmp,&ytmp,&rtmp,&l0tmp,&t0tmp,&vxtmp,&vytmp);
 
             // push back
             x.push_back(xtmp);
@@ -178,6 +182,8 @@ tumor2D::tumor2D(string &inputFileStr,int seed) : dpm(2) {
             r.push_back(rtmp);
             l0.push_back(l0tmp);
             t0.push_back(t0tmp);
+            //v.push_back(vxtmp);
+            //v.push_back(vytmp);
         }
         if (nv.at(ci)==1) {
             a0.at(ci) = PI*rtmp*rtmp;
@@ -191,6 +197,7 @@ tumor2D::tumor2D(string &inputFileStr,int seed) : dpm(2) {
     for (i = 0; i < NCELLS * (NCELLS - 1) / 2; i++)
         cij.at(i) = 0;
 
+    
     // initialize vertex indexing
     initializeVertexIndexing2D();
 
@@ -2792,6 +2799,10 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
         k++;
     }
     scaleFactor=tumorRescale(dt0);
+    fill(v.begin(), v.end(), 0.0);
+    for (ci=0; ci<tN; ci++){
+        psi[ci] = 2.0*PI*drand48();
+    }
 }
 
 //rescale so that mean(a0(tN+1,NCELLS))=1
@@ -2847,7 +2858,6 @@ void tumor2D::invasion(tumor2DMemFn forceCall, double dDr, double dPsi, double D
     for (ci=0; ci<tN; ci++){
         psi[ci] = 2.0*PI*drand48();
     }
-    psi[0] = 0;
     // loop over time, have active brownian crawlers invade adipocytes
     for (k=0; k<NT; k++){
         // pbcs and reset forces
@@ -2926,6 +2936,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         psi[ci] = 2.0*PI*drand48();
     }
     
+    
     // initial pressure
     CALL_MEMBER_FN(*this, forceCall)();
     fill(v.begin(), v.end(), 0.0);
@@ -2995,19 +3006,35 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         
         /*******************************************************************************************************************************/
         
+        if (press_it % 10000 == 0) {
+            //kinetic energy
+            K=0;
+            K_t=0;
+            for (int i = 0; i < NDIM*tN; i++){
+                K += v[i] * v[i];
+                K_t += v[i] * v[i];
+            }
+            for (int i = NDIM*tN; i < vertDOF; i++)
+                K += v[i] * v[i];
+            K *= 0.5;
+            K_t *= 0.5;
+            
+            cout << "===========================================" << endl;
+            cout << "            Relaxation                     " << endl;
+            cout << "===========================================" << endl;
+            cout << endl;
+            cout << "    ** press_it              = " << press_it << endl;
+            cout << "    ** press_ave             = " << press_ave << endl;
+            cout << "    ** P0                    = " << P0 << endl;
+            cout << "    ** wpos                  = " << wpos << endl;
+            cout << "   ** Kinetic        = " << K << endl;
+            cout << "   ** Kinetic_tumor  = " << K_t << endl;
+        }
         
-        if(press_it>20000){
+        if(press_it>200000){
             press_ave += wpress[0];
             if (press_it % 10000 == 0) {
                 press_ave = press_ave / 10000;
-                cout << "===========================================" << endl;
-                cout << "            Relaxation                     " << endl;
-                cout << "===========================================" << endl;
-                cout << endl;
-                cout << "    ** press_it              = " << press_it << endl;
-                cout << "    ** press_ave             = " << press_ave << endl;
-                cout << "    ** P0                    = " << P0 << endl;
-                cout << "    ** wpos                  = " << wpos << endl;
                 if (press_ave < 1.01* P0 && press_ave > 0.99* P0) {
                     press_teller = 1;
                 } else {
@@ -3215,8 +3242,9 @@ void tumor2D::printTumorInterface(double t){
 
     // print box sizes
     posout << setw(w) << left << "BOXSZ";
-    posout << setw(wnum) << setprecision(pnum) << left << L[0]-wpos;
+    posout << setw(wnum) << setprecision(pnum) << left << Lx;
     posout << setw(wnum) << setprecision(pnum) << left << Ly;
+    posout << setw(wnum) << setprecision(pnum) << left << wpos;
     posout << endl;
 
     // print stress info
@@ -3292,8 +3320,8 @@ void tumor2D::printTumorInterface(double t){
         posout << setw(wnum) << setprecision(pnum) << right << r.at(gi);
         posout << setw(wnum) << setprecision(pnum) << right << l0.at(gi);
         posout << setw(wnum) << setprecision(pnum) << right << t0.at(gi);
-        posout << setw(wnum) << setprecision(pnum) << right << F.at(NDIM * gi);
-        posout << setw(wnum) << setprecision(pnum) << right << F.at(NDIM * gi + 1);
+        posout << setw(wnum) << setprecision(pnum) << right << v.at(NDIM * gi);
+        posout << setw(wnum) << setprecision(pnum) << right << v.at(NDIM * gi + 1);
         posout << endl;
 
         // vertex information for next vertices
@@ -3362,6 +3390,7 @@ void tumor2D::printTumorCells(double t){
     posout << setw(w) << left << "BOXSZ";
     posout << setw(wnum) << setprecision(pnum) << left << Lx;
     posout << setw(wnum) << setprecision(pnum) << left << Ly;
+    posout << setw(wnum) << setprecision(pnum) << left << wpos;
     posout << endl;
 
     // print stress info
