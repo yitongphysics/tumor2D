@@ -1,7 +1,7 @@
 // header files
 #include "tumor2D.h"
 #include <sstream>
-
+#include <numeric>
 // preprocessor macros
 #define NDIM 2
 
@@ -14,20 +14,19 @@ const double boxLengthScale = 2.0; 	// neighbor list box size in units of initia
 const double phi0 = 0.6;		   	// initial packing fraction
 const double dt0 = 5e-2;		   	// initial magnitude of time step in units of MD time
 const double Ftol = 1e-8;			// force tolerance during energy min
-const double Ptol = 1e-5;		   	// target pressure in initial compression
 
 
 // mechanical constants
-const double ka = 1.0;
-const double kl = 0.1;
-const double kb = 0.005;
-const double kc = 0.1;
+//const double ka = 1.0;
+//const double kl = 0.001;
+//const double kb = 0.0;
+//const double kc = 0.1;
 
 int main(int argc, char const *argv[])
 {
 	// local variables to be read in
 	int NCELLS, aN, tN, aNV, tNV, seed;
-	double aDisp, tDisp, aCalA0, tCalA0, areaRatio, prt;
+	double aDisp, tDisp, aCalA0, tCalA0, areaRatio, prt, ka, kl, kb, kc, P0, aspectRatio;
 
 	// read in parameters from command line input
 	string aN_str 			= argv[1];
@@ -38,9 +37,15 @@ int main(int argc, char const *argv[])
 	string aCalA0_str 		= argv[6];
 	string tCalA0_str 		= argv[7];
 	string areaRatio_str 	= argv[8];
-	string prt_str 			= argv[9];
-	string seed_str 		= argv[10];
-	string positionFile 	= argv[11];
+    string aspectRatio_str  = argv[9];
+	string prt_str 			= argv[10];
+    string ka_str           = argv[11];             // ka
+    string kl_str           = argv[12];             // kl
+    string kc_str           = argv[13];             // kc
+    string kb_str           = argv[14];             // kb
+    string P0_str           = argv[15];
+	string seed_str 		= argv[16];
+	string positionFile 	= argv[17];
 
 	// using sstreams to get parameters
 	stringstream aNss(aN_str);
@@ -51,7 +56,13 @@ int main(int argc, char const *argv[])
 	stringstream aCalA0ss(aCalA0_str);
 	stringstream tCalA0ss(tCalA0_str);
 	stringstream areaRatioss(areaRatio_str);
+    stringstream aspectRatioss(aspectRatio_str);
 	stringstream prtss(prt_str);
+    stringstream kass(ka_str);
+    stringstream klss(kl_str);
+    stringstream kcss(kc_str);
+    stringstream kbss(kb_str);
+    stringstream P0ss(P0_str);
 	stringstream seedss(seed_str);
 
 	// read into data
@@ -63,11 +74,18 @@ int main(int argc, char const *argv[])
 	aCalA0ss 		>> aCalA0;
 	tCalA0ss 		>> tCalA0;
 	areaRatioss 	>> areaRatio;
+    aspectRatioss   >> aspectRatio;
 	prtss 			>> prt;
+    kass            >> ka;
+    klss            >> kl;
+    kcss            >> kc;
+    kbss            >> kb;
+    P0ss            >> P0;
 	seedss 			>> seed;
-
+    
 	// determine number of tumor cells based on areaRatio and prt
-	tN = round(aN * areaRatio * (prt/(1.0 - prt)));
+	//tN = round(aN * areaRatio * (prt/(1.0 - prt)));
+    tN = 939;
 	NCELLS = tN + aN;
 
 	// instantiate object
@@ -86,14 +104,14 @@ int main(int argc, char const *argv[])
 	tumor2Dobj.initializeTumorInterface(aCalA0, tCalA0, aDisp, tDisp, areaRatio, aNV, tNV);
 
 	// initialize particle positions
-	tumor2Dobj.initializeTumorInterfacePositions(phi0, Ftol, prt);
+	tumor2Dobj.initializeTumorInterfacePositions(phi0, Ftol, prt, aspectRatio);
 
 	// initialize neighbor linked list
 	tumor2Dobj.initializeNeighborLinkedList2D(boxLengthScale);
 
 	// -- compression to initial condition
-	tumor2Dobj.tumorCompression(Ftol,Ptol,dt0,dphi0);
-
+	tumor2Dobj.tumorCompression(Ftol,P0,dt0,dphi0);
+    
 	// print interface
 	tumor2Dobj.printTumorInterface(0.0);
 
