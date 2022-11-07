@@ -67,7 +67,7 @@ for ii=tN+1:NCELLS
         
         breaker=0;
         for jj=1:tN
-            sij = r{ii}+r{jj}*2;
+            sij = r{ii}+r{jj};
             xj=x{jj};
             
             if(xj > x_cut)
