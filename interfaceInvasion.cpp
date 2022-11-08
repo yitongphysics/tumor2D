@@ -27,7 +27,7 @@ using namespace std;
 //const double kc = 0.2;                    // interaction force spring constant
 //const double kb = 0.1;					// bending energy
 const double gamtt = 0.0; 				// surface tension
-const double boxLengthScale = 2.5;		// neighbor list box size in units of initial l0
+const double boxLengthScale = 2;		// neighbor list box size in units of initial l0
 const double dt0 = 1e-1;				// initial magnitude of time step in units of MD time
 const double Ftol = 1e-5;
 
@@ -137,6 +137,7 @@ int main(int argc, char const *argv[])
 	// run FIRE to relax forces fully
 	//tumor2Dobj.tumorFIRE(invasionForceUpdate,Ftol,0.2*dt0);
 	// invasion
+    cout.precision(10);
 	cout << "Running invasion protocol..." << endl;
 	// tumor2Dobj.invasion(invasionForceUpdate,dDr,dPsi,Drmin,NT,NPRINTSKIP);
     dDr = 0.01;
