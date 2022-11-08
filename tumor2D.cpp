@@ -345,18 +345,17 @@ void tumor2D::reNeighborLinkedList2D(double boxLengthScale) {
     for (d = 0; d < NDIM; d++) {
         // determine number of cells along given dimension by rmax
         if (d==0) {
-            sb[d] = round((L[d]-wpos) / (boxLengthScale * llscale));
+            sb[d] = floor((L[d]-wpos) / (boxLengthScale * llscale));
             lb[d] = (L[d]-wpos) / sb[d];
         }
         else{
-            sb[d] = round(L[d] / (boxLengthScale * llscale));
+            sb[d] = floor(L[d] / (boxLengthScale * llscale));
             lb[d] = L[d] / sb[d];
         }
-
         // count total number of cells
         NBX *= sb[d];
     }
-
+    
     // initialize list of box nearest neighbors
     scx = sb[0];
     nn.resize(NBX);
@@ -428,7 +427,7 @@ void tumor2D::reNeighborLinkedList2D(double boxLengthScale) {
     list.resize(NVTOT + 1);
 
     // print box info to console
-    //cout << ";  initially NBX = " << NBX << " ..." << endl;
+    //cout << "initially NBX = " << NBX << " ..." << endl;
     //cout << "sb = " << sb[0] << "," << sb[1] << "...lb = " << lb[0] << "," << lb[1] << endl;
 }
 
@@ -478,11 +477,11 @@ void tumor2D::neighborLinkedList2D() {
             } else {
                 boxid += floor(xtmp / lb[d]) * sbtmp;
             }
-
+            
             // increment dimensional factor
             sbtmp *= sb[d];
         }
-
+        //boxid = 0;
         // 2. add to head list or link within list
         // NOTE: particle ids are labelled starting from 1, setting to 0 means end of linked list
         if (head[boxid] == 0) {
@@ -2193,7 +2192,7 @@ void tumor2D::stickyTumorInterfaceForces(){
                 // update wall stresses
                 //wpress[0] -= fx/L[1];
             }
-
+            
             // cell index of gi
             cindices(ci, vi, gi);
             // next particle in list
@@ -2205,6 +2204,7 @@ void tumor2D::stickyTumorInterfaceForces(){
                 gj = pj - 1;
 
                 if (gj == ip1[gi] || gj == im1[gi]) {
+                    //cout << gi << " " << gj << endl;
                     pj = list[pj];
                     continue;
                 }
@@ -2316,6 +2316,7 @@ void tumor2D::stickyTumorInterfaceForces(){
 
             // test overlaps with forward neighboring cells
             for (bj = 0; bj < NNN; bj++) {
+                //break;
                 // only check if boundaries permit
                 if (nn[bi][bj] == -1)
                     continue;
@@ -2329,6 +2330,7 @@ void tumor2D::stickyTumorInterfaceForces(){
                     gj = pj - 1;
 
                     if (gj == ip1[gi] || gj == im1[gi]) {
+                        //cout << gi << " " << gj << endl;
                         pj = list[pj];
                         continue;
                     }
@@ -2935,16 +2937,17 @@ void tumor2D::invasion(tumor2DMemFn forceCall, double dDr, double dPsi, double D
 void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double g0, double dDr, double dPsi, double Drmin, int NT, int NPRINTSKIP){
     // check correct setup
     setupCheck();
-
+    
     // local variables
     int k, i, ci, cj, gi, d, upb = 20000;
     double t = 0.0, zta, Drtmp, Lold, Lnew, gam;
+    double subBoxLength = 2.0;
     double x_max=0;
     int press_teller,press_it=0;
     double press_ave =0.0;
     double dw = 0.0;
     double B = 3.0;
-    double M_wall = M;
+    double M_wall = M*tN;
     double V_wall = 0.0;
     double K_t=0.0;
     double K=0.0;
@@ -2987,7 +2990,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     pinattach.reserve(upb);
     ifbroken.reserve(upb);
     
-    reNeighborLinkedList2D(5);
+    reNeighborLinkedList2D(subBoxLength);
     neighborLinkedList2D();
     // initial pressure
     CALL_MEMBER_FN(*this, forceCall)();
@@ -3023,7 +3026,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         //update psi warning
         //psiECM();
         // update forces
-        reNeighborLinkedList2D(2.5);
+        reNeighborLinkedList2D(subBoxLength);
         neighborLinkedList2D();
         resetForcesAndEnergy();
         crawlerUpdate();
@@ -3097,6 +3100,36 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         }
         
         /*******************************************************************************************************************************/
+        // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
+        for (i=0; i<vertDOF; i++){
+            x[i] += dt * (v[i] +dt/2.0/M * (F[i] -B*v[i]));
+            v[i] += dt/2.0/M * (F[i] -B*v[i]*  (1.0+1.0/(1.0+B/2.0*dt)));
+        }
+        wpos += dt*(V_wall + dt/2.0/M_wall*((P0 - wpress[0])*L[1]-B*V_wall));
+        V_wall += dt/2.0/M_wall * ((P0 - wpress[0])*L[1]-B*V_wall*(1.0+1.0/(1.0+B/2.0*dt)));
+        // update psi before update force
+        psiDiffusion();
+        //psiECM();
+        
+        // sort particles
+        reNeighborLinkedList2D(subBoxLength);
+        neighborLinkedList2D();
+        // update forces
+        CALL_MEMBER_FN(*this, forceCall)();
+        /*//Euler update
+        for (i=0; i<vertDOF; i++){
+            v[i] += dt * F[i]/M;
+            x[i] += dt * v[i];
+        }
+        V_wall += dt * (P0 - wpress[0])*L[1] / M_wall;
+        wpos += dt * V_wall;
+         */
+        // update velocity 2nd term (Velocity Verlet, OVERDAMPED)
+        for (i=0; i<vertDOF; i++)
+            v[i] += dt/2.0/M * F[i]/(1.0+B/2.0*dt);
+
+        V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
+
         //kinetic energy
         K=0;
         K_t=0;
@@ -3109,31 +3142,6 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         K *= 0.5;
         K_t *= 0.5;
         
-        // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
-        for (i=0; i<vertDOF; i++){
-            x[i] += dt * (v[i] +dt/2.0/M * (F[i] -B*v[i]));
-            v[i] += dt/2.0/M * (F[i] -B*v[i]*  (1.0+1.0/(1.0+B/2.0*dt)));
-        }
-        wpos += dt*(V_wall + dt/2.0/M_wall*((P0 - wpress[0])*L[1]-B*V_wall));
-        V_wall += dt/2.0/M_wall * ((P0 - wpress[0])*L[1]-B*V_wall*(1.0+1.0/(1.0+B/2.0*dt)));
-        
-        // sort particles
-        reNeighborLinkedList2D(2.5);
-        neighborLinkedList2D();
-        
-        
-        // update psi before update force
-        psiDiffusion();
-        //psiECM();
-        // update forces
-        CALL_MEMBER_FN(*this, forceCall)();
-        
-        // update velocity 2nd term (Velocity Verlet, OVERDAMPED)
-        for (i=0; i<vertDOF; i++)
-            v[i] += dt/2.0/M * F[i]/(1.0+B/2.0*dt);
-
-        V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
-
         // update time
         t += dt;
         /********************************************************************************************************************************/
@@ -3146,13 +3154,12 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         if ((k+1) % NPRINTSKIP == 0){
             
             //find front
-            x_max = 0;
+            x_max = 0.0;
             for (i = 0; i<tN; i++) {
                 if (x[i*NDIM] > x_max) {
                     x_max = x[i*NDIM];
                 }
             }
-            
             
             cout << endl << endl;
             cout << "===========================================" << endl;
