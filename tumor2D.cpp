@@ -2482,7 +2482,7 @@ void tumor2D::repulsiveTumorInterfaceForceUpdate() {
 
 void tumor2D::stickyTumorInterfaceForceUpdate() {
     resetForcesAndEnergy();
-    crawlerUpdate();
+    //crawlerUpdate();
     stickyTumorInterfaceForces();
     tumorShapeForces();
     adipocyteECMAdhesionForces();
@@ -2946,17 +2946,24 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     int press_teller,press_it=0;
     double press_ave =0.0;
     double dw = 0.0;
-    double B = 3.0;
+    double B = 0.0;
     double M_wall = M*tN;
     double V_wall = 0.0;
     double K_t=0.0;
     double K=0.0;
+    
+    vector<int> tN_list;
+    for (ci=0; ci<tN; ci++){
+        tN_list.push_back(ci);
+    }
+    random_shuffle (tN_list.begin(), tN_list.end());
+
     // attach pins
     updateECMAttachments(1);
 
     //initialize psi warning
     for (ci=0; ci<tN; ci++){
-        psi[ci] = 2.0*PI*drand48();
+        psi[ci] = 2.0*PI*tN_list[ci]/tN;
     }
     //initialize velocity
     for (ci=0; ci<tN; ci++){
@@ -2996,7 +3003,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     CALL_MEMBER_FN(*this, forceCall)();
     
     // RELAXATION: update tumor cell positions (EULER UPDATE, OVERDAMPED)
-    press_teller = 0;
+    press_teller = 1;
     while (press_teller ==0) {
         press_it += 1;
         // pbcs and reset forces
