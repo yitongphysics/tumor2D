@@ -28,7 +28,7 @@ using namespace std;
 //const double kb = 0.1;					// bending energy
 const double gamtt = 0.0; 				// surface tension
 const double boxLengthScale = 2;		// neighbor list box size in units of initial l0
-const double dt0 = 1e-1;				// initial magnitude of time step in units of MD time
+const double dt0 = 10;				// initial magnitude of time step in units of MD time
 const double Ftol = 1e-5;
 
 int main(int argc, char const *argv[])
