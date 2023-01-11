@@ -1,14 +1,18 @@
 %% voronoi tesselation
 
-%clear;close all;clc
+clear;close all;clc
 
-%sim_name = '0.021_354';
-%pathname = '/Users/yitongzheng/Documents/Corey/tumor2D/OverDamped/1214_long/';
-%plotit = 1;
-%videoit = 1;
-%datait = 1;
+sim_name = '0.021_354';
+pathname = '/Users/yitongzheng/Documents/Corey/tumor2D/OverDamped/1214_long/';
+kc=0.03;
+l1=0.01;
+l2=0.5;
+kint = l1/(l2 - l1);
+plotit = 1;
+videoit = 1;
+datait = 1;
 
-%FEND = 1;
+FEND = 1;
 
 if(videoit)
     vid_name = append(pathname,sim_name,'_vor.mp4');
@@ -23,6 +27,10 @@ fid = fopen(fstr);
 
 
 L_sur = zeros(1,FEND);
+U_tt = zeros(1,FEND);
+U_ta = zeros(1,FEND);
+U_tw = zeros(1,FEND);
+%loop over frames
 for ii = 1:1:FEND
     vpos=[];
     % read in data
@@ -38,6 +46,7 @@ for ii = 1:1:FEND
     wpos = tumorConfigData.wpos;
     x = tumorConfigData.x;
     y = tumorConfigData.y;
+    r = tumorConfigData.r;
     x_v = [x{1:tN}];
     y_v = [y{1:tN}];
     for jj=tN+1:NCELLS
@@ -77,22 +86,28 @@ for ii = 1:1:FEND
     % loop over V_vor, find vertices that belongs to both T and A.
     % record cells and vertices
     nVT = size(V_vor);nVT=nVT(1);% number of voronoi vertices
-    V_list=[];
-    C_list={};
-    C_tuple = [];
+    V_list=[];% voronoi vertices shared by tumor and adipocytes
+    C_tuple = [];% unique and ordered list of adipocytes vertices touching tumor
+    V_tumor = [];% unique and ordered list of vertices on the interface
     for jj=2:nVT% exclude the first vertice (Inf,Inf).
         for kk=1:tN
-            if(~isempty(find(r_vor{kk+nV}==jj,1)))
+            if(~isempty(find(r_vor{kk+nV}==jj,1)))% if this vertice belongs to tumor kk
+                
+                if(V_vor(jj,1)<wpos||V_vor(jj,1)>Lx)% if this vertice touches wall
+                    V_tumor = [V_tumor;jj];
+                end
+                
                 for ll=tN+1:nV
                     if(~isempty(find(r_vor{ll+nV}==jj,1))||...
                         ~isempty(find(r_vor{ll}==jj,1))||...
-                        ~isempty(find(r_vor{ll+2*nV}==jj,1)))
+                        ~isempty(find(r_vor{ll+2*nV}==jj,1)))% if this vertice belongs to adi ll
+                    
+                        V_tumor = [V_tumor;jj];
+                        
                         if(isempty(find(V_list==jj,1)))
                             V_list=[V_list;jj];
-                            C_list{length(C_list)+1}=ll;
                             C_tuple = [C_tuple;ll];
                         else
-                            C_list{end}=[C_list{end},ll];
                             C_tuple = [C_tuple;ll];
                         end
                     end
@@ -101,10 +116,21 @@ for ii = 1:1:FEND
             end
         end
     end
-    %V_list(1)=[];
-    %C_list(1)=[];
-    [C_tuple,Index]=unique(C_tuple);
+    [C_tuple,~]=unique(C_tuple);
     C_tuple = [C_tuple;C_tuple + nV;C_tuple + 2*nV];
+    [V_tumor,~]=unique(V_tumor);
+    
+    % get C_tumor: unique and ordered list of tumor cells on the interface
+    C_tumor = [];
+    for kk=1:tN
+        for jj=1:length(V_tumor)
+            if(~isempty(find(r_vor{kk+nV}==V_tumor(jj),1)))% if this vertice belongs to tumor kk
+                C_tumor = [C_tumor;kk];
+                break
+            end
+        end
+    end
+    %scatter(x_v(C_tumor),y_v(C_tumor),50,'filled')
     
     %scatter(V_vor(V_list,1),V_vor(V_list,2),'b')
     %scatter(V_vor(V_list,1),V_vor(V_list,2)+Ly,'y')
@@ -198,7 +224,7 @@ for ii = 1:1:FEND
         end
     end
     
-    % find out which cell (wpos,0) and (Lx,0) belongs to
+    % delete image points on the list
     L_left = sort(L_left);
     if(mod(length(L_left),2)==1)
         for vi = 1:length(L_left)-1
@@ -218,6 +244,7 @@ for ii = 1:1:FEND
         end
     end
     
+    % compute tumor-adipocyte interface left length
     for jj=1:nV
         VVV = V_vor(r_vor{jj+nV},1);
         UUU = V_vor(r_vor{jj+nV},2);
@@ -247,6 +274,7 @@ for ii = 1:1:FEND
         end
     end
     
+    % compute interface length on the right wall
     for jj=1:nV
         VVV = V_vor(r_vor{jj+nV},1);
         UUU = V_vor(r_vor{jj+nV},2);
@@ -275,6 +303,70 @@ for ii = 1:1:FEND
             break;
         end
     end
+    
+    % compute Uia, Uib, and Uic
+    % loop over C_tumor, need to copy code from tumorEnergy
+    for jj=1:length(C_tumor)
+        xi=x_v(C_tumor(jj));
+        yi=x_v(C_tumor(jj));
+        ri=r(C_tumor(jj));ri=ri{1};
+        
+        % u_tw
+        if(xi-wpos < ri)
+            xij = (xi-wpos)/ri;
+            U_tw(ii) = U_tw(ii) + 0.5*power(1.0 - xij,2.0);
+        elseif(xi > Lx - ri)
+            xij = (Lx - xi)/ri;
+            U_tw(ii) = U_tw(ii) + 0.5*power(1.0 - xij,2.0);
+        end
+        
+        % u_tt
+        for kk=jj+1:tN
+            sij = r{jj}+r{kk};
+            xj=x{kk};
+            yj=y{kk};
+            dx=xi-xj;
+            dy=yi-yj;
+            dy = dy - Ly * round(dy / Ly);
+            if(dy<sij*(1+l2))
+                rij = sqrt(dx * dx + dy * dy);
+                if(dy<sij*(1+l2))
+                    xij=rij/sij;
+                    if(xij<1+l2)
+                        if(xij>1+l1)
+                           U_tt(ii) = U_tt(ii) - 0.5*kint*power(1.0 + l2 - xij,2.0); 
+                        else
+                           U_tt(ii) = U_tt(ii) + 0.5*(power(1.0 - xij,2.0) - l1*l2); 
+                        end
+                    end
+                end
+            end
+        end
+        
+        % u_ta
+        r_a = r{tN+1}; r_a = r_a(1);
+        for kk=tN+1:nV
+            sij = r{jj}+r_a;
+            xj=x_v(kk);
+            yj=y_v(kk);
+            dx=xi-xj;
+            dy=yi-yj;
+            dy = dy - Ly * round(dy / Ly);
+            if(dy<sij)
+                rij = sqrt(dx * dx + dy * dy);
+                if(dy<sij)
+                    xij=rij/sij;
+                    if(xij<1)
+                        U_ta(ii) = U_ta(ii) + 0.5*(power(1.0 - xij,2.0) - l1*l2); 
+                    end
+                end
+            end
+        end
+        
+        
+    end
+    
+    
     if(plotit)
         axis equal;
         ax = gca;
@@ -290,10 +382,15 @@ for ii = 1:1:FEND
     end
 end
 
+U_tt = U_tt*kc;
+U_ta = U_ta*kc;
+U_tw = U_tw*kc;
+
+
 if(videoit)
     close(vobj);
 end
 if(datait)
     data_name = append(pathname,'vT/',sim_name,'_VT.mat');
-    save(data_name,'L_sur');
+    save(data_name,'L_sur','U_tw','U_tt','U_ta');
 end
