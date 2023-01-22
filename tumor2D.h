@@ -26,6 +26,8 @@ protected:
     // temporary number of tumor cells
     int tN;
 
+    //energy terms
+    double Ua,Ul,Ub,Utest;
     // surface tension info
     double gamtt;
     std::vector<double> l0_init;

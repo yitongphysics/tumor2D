@@ -94,9 +94,8 @@ tumor2D::tumor2D(string &inputFileStr,int seed) : dpm(2) {
     sscanf(inputStr.c_str(),"BOXSZ %lf %lf %lf",&lxtmp,&lytmp,&wpostmp);
     //cout << "\t ** " << inputStr << endl;
     
-    
     if (wpostmp!=0) {
-        if (abs(log10(abs(wpostmp)))>3 || abs(wpostmp)>2) {
+        if (abs(log10(abs(wpostmp)))>3 || abs(wpostmp)>4) {
             wpostmp = 0;
         }
     }
@@ -323,7 +322,8 @@ void tumor2D::setdt(double dt0) {
     // set dt
     dt = dt0 * tmin;
     */
-    dt = dt0 * ta;
+    //dt = dt0 * ta;
+    dt = 0.035575623680000;
 }
 
 // initialize neighbor linked list: with wall position change
@@ -506,7 +506,7 @@ void tumor2D::initializeTumorMonolayerPositions(double phi0, double Ftol, double
     Dr.resize(tN);
     F_ij.resize(tN * NCELLS * NDIM);
     contactTime.resize(tN * (NCELLS - tN));
-
+    
     setl0_init();
 
     fill(psi.begin(), psi.end(), 2.0*PI*drand48());
@@ -1745,7 +1745,7 @@ void tumor2D::tumorShapeForces(){
         cindices(ci,vi,gi);
 
         //warning
-        if (ci<tN) {
+        if (nv[gi]==1) {
             continue;
         }
         // -- Area force (and get cell index ci)
@@ -1870,8 +1870,8 @@ void tumor2D::tumorShapeForces(){
         // update potential energy
         U += 0.5 * kl/nv[ci] * (dli * dli);
         Ul +=0.5 * kl/nv[ci] * (dli * dli);
+        
         // -- Bending force
-        // could be wrong
         if (kb > 0 && ci > tN - 1) {
             // get ip2 for third angle
             rip2x = x[NDIM * ip1[ip1[gi]]] - cx;
@@ -2241,7 +2241,7 @@ void tumor2D::stickyTumorInterfaceForces(){
 
                                 // increase potential energy
                                 U += -0.5*kint*pow(1.0 + l2 - xij,2.0);
-                                //Utest+=-0.5*kint*pow(1.0 + l2 - xij,2.0);
+                                Utest+=-0.5*kint*pow(1.0 + l2 - xij,2.0);
                             }
                             else{
                                 if ((ci < tN && cj < tN) || rij < sij){
@@ -2251,13 +2251,11 @@ void tumor2D::stickyTumorInterfaceForces(){
                                     // increase potential energy
                                     if(ci < tN && cj < tN){
                                         U += 0.5*kc*(pow(1.0 - xij,2.0) - l1*l2);
+                                        Utest += 0.5*kc*(pow(1.0 - xij,2.0) - l1*l2);
                                     }
                                     else{
                                         U += 0.5*kc*pow(1.0 - xij,2.0);
                                     }
-                                    //if (ci > tN && cj > tN) {
-                                        //Utest+= 0.5*kc*(pow(1.0 - xij,2.0) - l1*l2);
-                                    //}
                                 }
                                 else{
                                     pj = list[pj];
@@ -2367,7 +2365,7 @@ void tumor2D::stickyTumorInterfaceForces(){
 
                                     // increase potential energy
                                     U += -0.5*kint*pow(1.0 + l2 - xij,2.0);
-                                    //Utest+=-0.5*kint*pow(1.0 + l2 - xij,2.0);
+                                    Utest+=-0.5*kint*pow(1.0 + l2 - xij,2.0);
                                 }
                                 else{
                                     if ((ci < tN && cj < tN) || rij < sij){
@@ -2377,13 +2375,12 @@ void tumor2D::stickyTumorInterfaceForces(){
                                         // increase potential energy
                                         if(ci < tN && cj < tN){
                                             U += 0.5*kc*(pow(1.0 - xij,2.0) - l1*l2);
+                                            Utest += 0.5*kc*(pow(1.0 - xij,2.0) - l1*l2);
                                         }
                                         else{
                                             U += 0.5*kc*pow(1.0 - xij,2.0);
                                         }
-                                        //if (ci > tN && cj > tN) {
-                                            //Utest+= 0.5*kc*(pow(1.0 - xij,2.0) - l1*l2);
-                                        //}
+                                        
                                     }
                                     else{
                                         pj = list[pj];
@@ -2790,7 +2787,8 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
             rho0 +=a0[ci];
         }
         rho0 = rho0/(NCELLS-tN);
-        
+        //warning
+        rho0 = pow((r.at(1)+r.at(800))/2/0.070523697943470,2.0);
         pcheck = wpress[0] * rho0;
         
         // remove rattlers
@@ -2816,7 +2814,7 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
         cout << endl << endl;
         
     
-        //printTumorInterface(0.0);
+        printTumorInterface(0.0);
         // update iterate
         k++;
     }
@@ -2838,6 +2836,8 @@ double tumor2D::tumorRescale(double dt0){
     meanArea = meanArea/(NCELLS-tN);
     
     scaleFactor = sqrt(meanArea);
+    //make r0=0.070523697943470;
+    scaleFactor = (r.at(1)+r.at(800))/2/0.070523697943470;
     
     L[0] = L[0]/scaleFactor;
     L[1] = L[1]/scaleFactor;
@@ -3036,7 +3036,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         reNeighborLinkedList2D(subBoxLength);
         neighborLinkedList2D();
         resetForcesAndEnergy();
-        crawlerUpdate();
+        //crawlerUpdate();
         stickyTumorInterfaceForces();
 
 
@@ -3094,6 +3094,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     // update forces
     // loop over time, have active brownian crawlers invade adipocytes
     
+    //printTumorInterface(t);
     for (k=0; k<NT; k++){
         // pbcs and reset forces
         for (i=0; i<vertDOF; i++){
@@ -3137,6 +3138,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
 
         V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
 
+        
         //kinetic energy
         K=0;
         K_t=0;
@@ -3149,6 +3151,25 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         K *= 0.5;
         K_t *= 0.5;
         
+        
+        if(k<100000){
+            for (int i = 0; i < vertDOF; i++){
+                v[i] = v[i] * sqrt(NVTOT*M*v0*v0/2/K);
+            }
+            //kinetic energy
+            K=0;
+            K_t=0;
+            for (int i = 0; i < NDIM*tN; i++){
+                K += v[i] * v[i];
+                K_t += v[i] * v[i];
+            }
+            for (int i = NDIM*tN; i < vertDOF; i++)
+                K += v[i] * v[i];
+            K *= 0.5;
+            K_t *= 0.5;
+        }
+        
+        
         // update time
         t += dt;
         /********************************************************************************************************************************/
@@ -3158,7 +3179,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         //tumorDivide(g0);
         
         // print message console, print position to file
-        if ((k+1) % NPRINTSKIP == 0){
+        if ((k+1) % NPRINTSKIP == 0 || k==0){
             
             //find front
             x_max = 0.0;
@@ -3175,26 +3196,28 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             cout << endl;
             cout << "    ** k             = " << k+1 << endl;
             cout << "    ** t             = " << t << endl;
-            cout << "   ** N_t        = " << tN << endl;
-            cout << "    ** P wall         = " << wpress[0] << endl;
-            cout << "    ** Lx           = " << L[0]-wpos << endl;
-            cout << "   ** front        = " << x_max << endl;
+            cout << "   ** N_t            = " << tN << endl;
+            cout << "    ** P wall        = " << wpress[0] << endl;
+            cout << "    ** Lx            = " << L[0]-wpos << endl;
+            cout << "   ** front          = " << x_max << endl;
             cout << "   ** E              = " << U + K + M_wall*V_wall*V_wall/2 - wpos*P0*L[1]  << endl;
             cout << "   ** U              = " << U << endl;
             cout << "   ** Ua             = " << Ua << endl;
-            cout << "   ** Ul            = " << Ul << endl;
+            cout << "   ** Ul             = " << Ul << endl;
             cout << "   ** Kinetic        = " << K<< endl;
             cout << "   ** Kinetic_tumor  = " << K_t << endl;
             cout << "   ** Kinetic_wall   = " << M_wall*V_wall*V_wall/2 << endl;
-            cout << "   ** potential_wall   = " << -wpos*P0*L[1] << endl;
+            cout << "   ** potential_wall = " << -wpos*P0*L[1] << endl;
+            cout << "   ** U_tumor        = " << Utest << endl;
             //cout << "   ** rij              = " << sqrt((x[0]-x[2])*(x[0]-x[2])+(x[1]-x[3])*(x[1]-x[3])) << endl;
             //cout << "   ** Fij              = " << sqrt(F[0]*F[0]+F[1]*F[1]) << endl;
             // print vertex positions to check placement
             cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
             
-            printTumorInterface(t);
+            if ((k+1) % (NPRINTSKIP*10) == 0) {
+                printTumorInterface(t);
+            }
         }
-        
     }
 }
 
