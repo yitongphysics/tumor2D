@@ -10,7 +10,7 @@ using namespace std;
 
 // global constants
 const double dphi0= 0.01;	   		// packing fraction increment during initial growth step
-const double boxLengthScale = 2.0; 	// neighbor list box size in units of initial l0
+const double boxLengthScale = 1.0; 	// neighbor list box size in units of initial l0
 const double phi0 = 0.6;		   	// initial packing fraction
 const double dt0 = 5e-2;		   	// initial magnitude of time step in units of MD time
 const double Ftol = 1e-8;			// force tolerance during energy min
@@ -85,7 +85,7 @@ int main(int argc, char const *argv[])
     
 	// determine number of tumor cells based on areaRatio and prt
 	//tN = round(aN * areaRatio * (prt/(1.0 - prt)));
-    tN = 939;
+    tN = 1000;
 	NCELLS = tN + aN;
 
 	// instantiate object
