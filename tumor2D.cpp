@@ -1738,18 +1738,20 @@ void tumor2D::tumorShapeForces(){
     double nim1x, nim1y, nix, niy, sinim1, sini, sinip1, cosim1, cosi, cosip1;
     double ddtim1, ddti;
 
+
     // loop over vertices, add to force
     ci = 0;
     for (gi = 0; gi < NVTOT; gi++) {
         // if tumor, then no shape force
         cindices(ci,vi,gi);
-
+        
         //warning
-        if (nv[gi]==1) {
+        if (nv[ci]==1) {
             continue;
         }
         // -- Area force (and get cell index ci)
         if (ci < NCELLS) {
+            //if gi is the first vertice in its cell
             if (gi == szList[ci]) {
                 // shape information
                 nvtmp = nv[ci];
@@ -1843,7 +1845,7 @@ void tumor2D::tumorShapeForces(){
         // -- Area force
         F[NDIM * gi] += 0.5 * fa * (rim1y - rip1y);
         F[NDIM * gi + 1] += 0.5 * fa * (rip1x - rim1x);
-
+        
         // -- Perimeter force
         lix = rip1x - rix;
         liy = rip1y - riy;
@@ -2658,6 +2660,9 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
 
         
         // update forces (function passed as argument)
+        // sort particles
+        reNeighborLinkedList2D(2.0);
+        neighborLinkedList2D();
         CALL_MEMBER_FN(*this, forceCall)();
 
         // VV VELOCITY UPDATE #2
@@ -2767,6 +2772,7 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
 
     // loop until pcheck > Ptol is found
     //warning
+    //printTumorInterface(0.0);
     while (pcheck < Ptol && k < itmax) {
         // relax configuration (pass repsulive force update member function)
         // scale particle sizes
@@ -2814,7 +2820,7 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
         cout << endl << endl;
         
     
-        printTumorInterface(0.0);
+        //printTumorInterface(0.0);
         // update iterate
         k++;
     }
