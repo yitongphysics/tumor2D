@@ -2957,6 +2957,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     double V_wall = 0.0;
     double K_t=0.0;
     double K=0.0;
+    double beta_K=0.0;
     
     vector<int> tN_list;
     for (ci=0; ci<tN; ci++){
@@ -3115,6 +3116,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         
         /*******************************************************************************************************************************/
         // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
+
         for (i=0; i<vertDOF; i++){
             x[i] += dt * (v[i] +dt/2.0/M * (F[i] -B*v[i]));
             v[i] += dt/2.0/M * (F[i] -B*v[i]*  (1.0+1.0/(1.0+B/2.0*dt)));
@@ -3144,6 +3146,9 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
 
         V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
 
+        // update time
+        t += dt;
+        /********************************************************************************************************************************/
         
         //kinetic energy
         K=0;
@@ -3156,29 +3161,6 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             K += v[i] * v[i];
         K *= 0.5;
         K_t *= 0.5;
-        
-        
-        if(k<100000){
-            for (int i = 0; i < vertDOF; i++){
-                v[i] = v[i] * sqrt(NVTOT*M*v0*v0/2/K);
-            }
-            //kinetic energy
-            K=0;
-            K_t=0;
-            for (int i = 0; i < NDIM*tN; i++){
-                K += v[i] * v[i];
-                K_t += v[i] * v[i];
-            }
-            for (int i = NDIM*tN; i < vertDOF; i++)
-                K += v[i] * v[i];
-            K *= 0.5;
-            K_t *= 0.5;
-        }
-        
-        
-        // update time
-        t += dt;
-        /********************************************************************************************************************************/
         
         //tumor cell growth and divide warning
         //tumorGrowth(g0);

@@ -16,6 +16,7 @@
 */
 
 #include "dpm.h"
+#include <random>
 
 class tumor2D;
 typedef void (tumor2D::*tumor2DMemFn)(void);
