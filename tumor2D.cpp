@@ -2760,6 +2760,18 @@ void tumor2D::setupCheck(){
 void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi0){
     int ci;
     double meanArea=0.0;
+    double B=1.0;
+    int i=0;
+    int press_teller;
+    int press_it=0;
+    double press_ave =0.0;
+    double K=0.0;
+    double V_wall=0.0;
+    double M = 1.0;
+    double M_wall = M*tN;
+    double P0=Ptol;
+    vector<int> tN_list;
+    
     // check correct setup
     setupCheck();
 
@@ -2779,6 +2791,10 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
         // update packing fraction
         phi0 = vertexPreferredPackingFraction2D();
 
+        if(pcheck > Ptol*0.1) {
+            dphi0 = 0.001;
+        }
+        
         scaleFactor = sqrt((phi0 + dphi0) / phi0);
         scaleParticleSizes2D(scaleFactor);
         // rescale so that mean(a0(tN+1,NCELLS))=1
@@ -2825,6 +2841,104 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
         k++;
     }
     scaleFactor=tumorRescale(dt0);
+    
+    // RELAXATION: update tumor cell positions (EULER UPDATE, OVERDAMPED)
+    setdt(0.1);
+    
+    fill(v.begin(), v.end(), 0.0);
+    for (ci=0; ci<tN; ci++){
+        tN_list.push_back(ci);
+    }
+    random_shuffle (tN_list.begin(), tN_list.end());
+    for (ci=0; ci<tN; ci++){
+        psi[ci] = 2.0*PI*tN_list[ci]/tN;
+        v[NDIM*ci] = 0.01*cos(psi[ci]);
+        v[NDIM*ci + 1] = 0.01*sin(psi[ci]);
+    }
+    
+    wpos = 0.0;
+    press_teller = 0;
+    while (press_teller ==0) {
+        press_it += 1;
+        // pbcs and reset forces
+        for (i=0; i<vertDOF; i++){
+            // recenter in box (only if y)
+            if (i % NDIM == 1){
+                if (x[i] > L[1])
+                    x[i] -= L[1];
+                else if (x[i] < 0)
+                    x[i] += L[1];
+            }
+        }
+        
+        /*******************************************************************************************************************************/
+        // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
+        for (i=0; i<tN*NDIM; i++){
+            x[i] += dt * (v[i] +dt/2.0/M * (F[i] -B*v[i]));
+            v[i] += dt/2.0/M * (F[i] -B*v[i]*  (1.0+1.0/(1.0+B/2.0*dt)));
+        }
+        wpos += dt*(V_wall + dt/2.0/M_wall*((P0 - wpress[0])*L[1]-B*V_wall));
+        V_wall += dt/2.0/M_wall * ((P0 - wpress[0])*L[1]-B*V_wall*(1.0+1.0/(1.0+B/2.0*dt)));
+        
+        
+        // update psi before update force
+        // update psi based on persistence warning
+        psiDiffusion();
+        //update psi warning
+        //psiECM();
+        // update forces
+        reNeighborLinkedList2D(2.0);
+        neighborLinkedList2D();
+        resetForcesAndEnergy();
+        //crawlerUpdate();
+        repulsiveTumorInterfaceForces();
+
+
+        // update velocity 2nd term (Velocity Verlet, OVERDAMPED)
+        for (i=0; i<tN*NDIM; i++)
+            v[i] += dt/2.0/M * F[i]/(1.0+B/2.0*dt);
+
+        V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
+      
+        /*******************************************************************************************************************************/
+        
+        if (press_it % 10000 == 0) {
+            //kinetic energy
+            K=0;
+            for (int i = 0; i < vertDOF; i++){
+                K += v[i] * v[i];
+            }
+            K *= 0.5;
+            K += M_wall*V_wall*V_wall/2;
+            
+            cout << "===========================================" << endl;
+            cout << "            Relaxation                     " << endl;
+            cout << "===========================================" << endl;
+            cout << endl;
+            cout << "    ** press_it              = " << press_it << endl;
+            cout << "    ** press_ave             = " << press_ave << endl;
+            cout << "    ** P0                    = " << P0 << endl;
+            cout << "    ** wpos                  = " << wpos << endl;
+            cout << "   ** E              = " << U+K - wpos*P0*L[1] << endl;
+            cout << "   ** U              = " << U << endl;
+            cout << "   ** Kinetic        = " << K << endl;
+            
+        }
+        
+        if(press_it>20000){
+            press_ave += wpress[0];
+            if (press_it % 10000 == 0) {
+                press_ave = press_ave / 10000;
+                if (press_ave < 1.01* P0 && press_ave > 0.99* P0 && K<1e-7) {
+                    press_teller = 1;
+                } else {
+                    press_ave = 0.0;
+                }
+            }
+        }
+    }
+    
+    
     fill(v.begin(), v.end(), 0.0);
     for (ci=0; ci<tN; ci++){
         psi[ci] = 2.0*PI*drand48();
@@ -2843,7 +2957,7 @@ double tumor2D::tumorRescale(double dt0){
     
     scaleFactor = sqrt(meanArea);
     //make r0=0.070523697943470;
-    scaleFactor = (r.at(1)+r.at(800))/2/0.070523697943470;
+    //scaleFactor = (r.at(1)+r.at(800))/2/0.070523697943470;
     
     L[0] = L[0]/scaleFactor;
     L[1] = L[1]/scaleFactor;
