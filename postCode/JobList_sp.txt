@@ -1,0 +1,4 @@
+matlab -nodisplay -nosplash -r 'sp_dis(0.0025,35); exit';
+matlab -nodisplay -nosplash -r 'sp_dis(0.005,35); exit';
+matlab -nodisplay -nosplash -r 'sp_dis(0.0075,35); exit';
+matlab -nodisplay -nosplash -r 'sp_dis(0.01,35); exit';
