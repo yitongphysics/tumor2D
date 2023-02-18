@@ -2,7 +2,7 @@ function Vt_phi(sim_name)
 %% voronoi tesselation for packing fraction
 % assume all adipocytes have the same number of vertices
 
-pathname = append('/Users/yitongzheng/Documents/Corey/tumor2D/OverDamped/0207_P0','/');
+pathname = append(pwd,'/');
 sim_name = string(sim_name);
 
 FEND = 1000;
