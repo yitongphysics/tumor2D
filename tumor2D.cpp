@@ -3255,7 +3255,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         v[i] *= sqrt(K0/K);
     
     
-    printTumorInterface(t);
+    //printTumorInterface(t);
     for (k=0; k<NT; k++){
         // pbcs and reset forces
         for (i=0; i<vertDOF; i++){
