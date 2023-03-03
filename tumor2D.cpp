@@ -3235,7 +3235,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             //cout << "H1=" << H_ave1 << endl;
             //cout << "H2=" << H_ave2 << endl;
             //cout << "H1/H2=" << H_ave2/H_ave1 << endl;
-            if (H_ave1 < 1.001* H_ave2 && H_ave1 > 0.999 * H_ave2) {
+            if (H_ave1 < 1.1* H_ave2 && H_ave1 > 0.9 * H_ave2) {
                 press_teller = 1;
             } else {
                 H_ave2 = H_ave1;
