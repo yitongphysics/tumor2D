@@ -2514,6 +2514,7 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
     // FIRE variables
     double P, fnorm, fcheck, vnorm, alpha, dtmax, dtmin, frec;
     int npPos, npNeg, fireit;
+    double V_wall = 0.0;
 
     // set dt based on geometric parameters
     setdt(dt0);
@@ -2616,7 +2617,10 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
                 // reset vertex velocities
                 v[i] = 0.0;
             }
-
+            //wpos -=0.5 * dt * V_wall;
+            //V_wall = 0.0;
+            
+            
             // decrease time step if past initial delay
             if (fireit > NDELAY) {
                 // decrease time step
@@ -2631,7 +2635,8 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
         // VV VELOCITY UPDATE #1
         for (i = 0; i < vertDOF; i++)
             v[i] += 0.5 * dt * F[i];
-
+        //V_wall += 0.5 * dt * (P0- wpress[0])*L[1] ;
+        
         // compute fnorm, vnorm and P
         fnorm = 0.0;
         vnorm = 0.0;
@@ -2639,6 +2644,9 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
             fnorm += F[i] * F[i];
             vnorm += v[i] * v[i];
         }
+        //fnorm += (P0 - wpress[0])*L[1] * (P0 - wpress[0])*L[1];
+        //vnorm += V_wall * V_wall;
+        
         fnorm = sqrt(fnorm);
         vnorm = sqrt(vnorm);
 
@@ -2646,6 +2654,7 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
         if (fnorm > 0) {
             for (i = 0; i < vertDOF; i++)
                 v[i] = (1 - alpha) * v[i] + alpha * (F[i] / fnorm) * vnorm;
+            //V_wall = (1 - alpha) * V_wall + alpha * ((P0 - wpress[0])*L[1] / fnorm) * vnorm;
         }
 
         // VV POSITION UPDATE
@@ -2659,7 +2668,7 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
             else if (x[i] < 0.0 && pbc[i % NDIM])
                 x[i] += L[i % NDIM];
         }
-
+        //wpos += dt * V_wall;
         
         // update forces (function passed as argument)
         // sort particles
@@ -2671,7 +2680,7 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
         for (i = 0; i < vertDOF; i++){
             v[i] += 0.5 * F[i] * dt;
         }
-
+        //V_wall += 0.5 * (P0 - wpress[0])*L[1] * dt;
         // update fcheck based on fnorm (= force per degree of freedom)
         /*
         fcheck = 0.0;
@@ -2685,6 +2694,7 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
                 fcheck=abs(F[i]);
             }
         }
+        
         // update iterator
         fireit++;
 
@@ -3120,7 +3130,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     /*
     tumorFIRE(&tumor2D::stickyTumorInterfaceForceUpdate, 1e-7, 5e-2);
     // RELAXATION: reach ground state by FIRE, considering pressure and stickyness.
-    press_teller = 0;
+    press_teller = 1;
     B=3.0;
     //warning
     while (press_teller ==0) {
@@ -3135,7 +3145,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
                     x[i] += L[1];
             }
         }
-        
+        tumorFIRE(&tumor2D::stickyTumorInterfaceForceUpdate, 1e-7, 5e-2);
         // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
         wpos += dt*(V_wall + dt/2.0/M_wall*((P0 - wpress[0])*L[1]-B*V_wall));
         V_wall += dt/2.0/M_wall * ((P0 - wpress[0])*L[1]-B*V_wall*(1.0+1.0/(1.0+B/2.0*dt)));
@@ -3151,8 +3161,11 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         // update velocity 2nd term (Velocity Verlet, OVERDAMPED)
         V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
         
-        if (press_it % 10000 == 0) {
-            if (wpress[0] < 1.00001* P0 && wpress[0] > 0.99999* P0) {
+        if (press_it % 10 == 0) {
+            cout << press_it << endl;
+            cout << "wpos=" << wpos << endl;
+            cout << "pressure = " << wpress[0] << endl;
+            if (wpress[0] < 1.001* P0 && wpress[0] > 0.999* P0) {
                 press_teller = 1;
             }
         }
@@ -3174,9 +3187,10 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         v[NDIM*gi] = v0*cos(2.0*PI*tN_list[gi]/NVTOT);
         v[NDIM*gi + 1] = v0*sin(2.0*PI*tN_list[gi]/NVTOT);
     }
-    
+    printTumorInterface(t);
     //constant temperature simulation
-    press_teller = 0;
+    // temperature is fixed at some value. Strong damping on the wall.
+    press_teller = 1;
     K0 = 1.0/2.0 * NVTOT * M * v0 * v0;
     while (press_teller ==0) {
         press_it += 1;
@@ -3244,16 +3258,21 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         }
     }
     
-    //the K0 should be in order to get H_ave.
-    K0 = (H_ave1 + H_ave2)/2 - U - P0*L[1]*(L[0]-wpos);
     V_wall = 0.0;
     K=0;
     for (int i = 0; i < vertDOF; i++)
         K += v[i] * v[i];
     K *= 0.5;
-    for (int i = 0; i < vertDOF; i++)
-        v[i] *= sqrt(K0/K);
     
+    //Let K=K0 in order to get H_ave.
+    if(press_teller ==0){
+        K0 = (H_ave1 + H_ave2)/2 - U - P0*L[1]*(L[0]-wpos);
+        if(K0<0)
+            K0=0;
+        
+        for (int i = 0; i < vertDOF; i++)
+            v[i] *= sqrt(K0/K);
+    }
     
     //printTumorInterface(t);
     for (k=0; k<NT; k++){
@@ -3270,7 +3289,6 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         
         /*******************************************************************************************************************************/
         // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
-
         for (i=0; i<vertDOF; i++){
             x[i] += dt * (v[i] +dt/2.0/M * (F[i] -B*v[i]));
             v[i] += dt/2.0/M * (F[i] -B*v[i]*  (1.0+1.0/(1.0+B/2.0*dt)));
@@ -3369,6 +3387,11 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             
             if ((k+1) % (NPRINTSKIP*10) == 0) {
                 printTumorInterface(t);
+                //annealing
+                if ((k+1) % (NPRINTSKIP*10*100) == 0) {
+                    for (int i = 0; i < vertDOF; i++)
+                        v[i] *= 0.9;
+                }
             }
         }
     }
