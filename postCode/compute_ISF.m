@@ -2,7 +2,7 @@ function compute_ISF(sim_name)
 
 sim_name = string(sim_name*0.0002);
 pathname = append(pwd,'/');
-fstr = append(pathname,'pos/',sim_name,'.pos');
+fstr = append(pathname,sim_name,'.pos');
 
 finfo = dir(fstr);
 fprintf('-- Reading in %s\n',finfo.name);
