@@ -1270,6 +1270,7 @@ void tumor2D::psiDiffusion(){
         // generate random variable
         r1 = drand48();
         r2 = drand48();
+        //grv is standard-norm-distributed: miu=0, sigma=1;
         grv = sqrt(-2.0*log(r1))*cos(2.0*PI*r2);
 
         // update director for cell ci
@@ -2482,7 +2483,7 @@ void tumor2D::repulsiveTumorInterfaceForceUpdate() {
 
 void tumor2D::stickyTumorInterfaceForceUpdate() {
     resetForcesAndEnergy();
-    //crawlerUpdate();
+    crawlerUpdate();
     stickyTumorInterfaceForces();
     tumorShapeForces();
     //adipocyteECMAdhesionForces();
@@ -3124,10 +3125,12 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     // initial pressure
     CALL_MEMBER_FN(*this, forceCall)();
 
+    //relexation and constant temperature simulations to get expected temperature
+    /*
     // relaxation : when change kb
-    tumorFIRE(&tumor2D::stickyTumorInterfaceForceUpdate, 1e-7, 5e-2);
+    //tumorFIRE(&tumor2D::stickyTumorInterfaceForceUpdate, 1e-7, 5e-2);
     // RELAXATION: reach ground state by FIRE, considering pressure and stickyness.
-    press_teller = 1;
+    press_teller = 0;
     B=3.0;
     //warning
     while (press_teller ==0) {
@@ -3202,7 +3205,6 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             }
         }
         
-        /*******************************************************************************************************************************/
         // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
         for (i=0; i<NVTOT*NDIM; i++){
             x[i] += dt * (v[i] +dt/2.0/M * (F[i] -B*v[i]));
@@ -3271,7 +3273,17 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         for (int i = 0; i < vertDOF; i++)
             v[i] *= sqrt(K0/K);
     }
+     */
     //printTumorInterface(t);
+    
+    for (ci=0; ci<tN; ci++){
+        tN_list.push_back(ci);
+    }
+    random_shuffle (tN_list.begin(), tN_list.end());
+    for (ci=0; ci<tN; ci++){
+        psi[ci] = 2.0*PI*tN_list[ci]/tN;
+    }
+    printTumorInterface(t);
     for (k=0; k<NT; k++){
         // pbcs and reset forces
         for (i=0; i<vertDOF; i++){
@@ -3293,7 +3305,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         wpos += dt*(V_wall + dt/2.0/M_wall*((P0 - wpress[0])*L[1]-B*V_wall));
         V_wall += dt/2.0/M_wall * ((P0 - wpress[0])*L[1]-B*V_wall*(1.0+1.0/(1.0+B/2.0*dt)));
         // update psi before update force
-        //psiDiffusion();
+        psiDiffusion();
         //psiECM();
         
         // sort particles
@@ -3312,7 +3324,6 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         // update velocity 2nd term (Velocity Verlet, OVERDAMPED)
         for (i=0; i<NVTOT*NDIM; i++)
             v[i] += dt/2.0/M * F[i]/(1.0+B/2.0*dt);
-
         V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
 
         // update time
