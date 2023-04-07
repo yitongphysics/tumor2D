@@ -2515,7 +2515,7 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
     double P, fnorm, fcheck, vnorm, alpha, dtmax, dtmin, frec;
     int npPos, npNeg, fireit;
     double V_wall = 0.0;
-
+    //double P0=0.001;
     // set dt based on geometric parameters
     setdt(dt0);
 
@@ -2546,8 +2546,9 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
         P = 0.0;
         for (i = 0; i < vertDOF; i++)
             P += v[i] * F[i];
-        /*
+        //P += V_wall * (P0 - wpress[0])*L[1];
         // print to console
+        /*
         if (fireit % NSKIP == 0) {
             cout << endl
                  << endl;
@@ -2559,22 +2560,16 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
             cout << "    ** fireit     = " << fireit << endl;
             cout << "    ** fcheck     = " << fcheck << endl;
             cout << "   ** Ftol     = " << Ftol << endl;
-            cout << "    ** U         = " << U << endl;
+            cout << "    ** wpos         = " << wpos << endl;
             cout << "    ** dt         = " << dt << endl;
             cout << "    ** P         = " << P << endl;
             cout << "    ** alpha     = " << alpha << endl;
             cout << "    ** npPos     = " << npPos << endl;
             cout << "   ** npNeg     = " << npNeg << endl;
             cout << "   ** phi      = " << vertexPreferredPackingFraction2D() << endl;
-            
-            if (fcheck > 0.99 * frec && fcheck < 1.01 * frec) {
-                break;
-            }
-            else{
-                frec = fcheck;
-            }
+            //printTumorInterface(0);
         }
-         */
+        */
 
         //cout << accumulate(F.begin(), F.end(), 1) << endl;
         //cout << vnorm << endl;
@@ -2672,8 +2667,8 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
         
         // update forces (function passed as argument)
         // sort particles
-        reNeighborLinkedList2D(2.0);
-        neighborLinkedList2D();
+        //reNeighborLinkedList2D(2.0);
+        //neighborLinkedList2D();
         CALL_MEMBER_FN(*this, forceCall)();
 
         // VV VELOCITY UPDATE #2
@@ -2694,6 +2689,9 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
                 fcheck=abs(F[i]);
             }
         }
+        //if (fcheck<abs((P0 - wpress[0])*L[1])) {
+            //fcheck=abs((P0 - wpress[0])*L[1]);
+        //}
         
         // update iterator
         fireit++;
@@ -3081,7 +3079,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     int press_teller,press_it=0;
     double press_ave =0.0;
     double dw = 0.0;
-    double B = 0.0;
+    double B = 3.0;
     double H=0.0;
     double H_ave1 = 0.0;
     double H_ave2 = 0.0;
@@ -3125,9 +3123,8 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     neighborLinkedList2D();
     // initial pressure
     CALL_MEMBER_FN(*this, forceCall)();
-    
+
     // relaxation : when change kb
-    /*
     tumorFIRE(&tumor2D::stickyTumorInterfaceForceUpdate, 1e-7, 5e-2);
     // RELAXATION: reach ground state by FIRE, considering pressure and stickyness.
     press_teller = 1;
@@ -3168,10 +3165,10 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             if (wpress[0] < 1.001* P0 && wpress[0] > 0.999* P0) {
                 press_teller = 1;
             }
+            //printTumorInterface(0.0);
         }
     }
     B=0.0;
-    */
     fill(contactTime.begin(),contactTime.end(),0);
 
     //compute H
@@ -3265,6 +3262,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     K *= 0.5;
     
     //Let K=K0 in order to get H_ave.
+    //warning
     if(press_teller ==0){
         K0 = (H_ave1 + H_ave2)/2 - U - P0*L[1]*(L[0]-wpos);
         if(K0<0)
@@ -3273,7 +3271,6 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         for (int i = 0; i < vertDOF; i++)
             v[i] *= sqrt(K0/K);
     }
-    
     //printTumorInterface(t);
     for (k=0; k<NT; k++){
         // pbcs and reset forces
@@ -3289,7 +3286,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         
         /*******************************************************************************************************************************/
         // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
-        for (i=0; i<vertDOF; i++){
+        for (i=0; i<NVTOT*NDIM; i++){
             x[i] += dt * (v[i] +dt/2.0/M * (F[i] -B*v[i]));
             v[i] += dt/2.0/M * (F[i] -B*v[i]*  (1.0+1.0/(1.0+B/2.0*dt)));
         }
@@ -3313,7 +3310,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         wpos += dt * V_wall;
          */
         // update velocity 2nd term (Velocity Verlet, OVERDAMPED)
-        for (i=0; i<vertDOF; i++)
+        for (i=0; i<NVTOT*NDIM; i++)
             v[i] += dt/2.0/M * F[i]/(1.0+B/2.0*dt);
 
         V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
@@ -3327,8 +3324,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         //tumorDivide(g0);
         
         // print message console, print position to file
-        if ((k+1) % NPRINTSKIP == 0 || k==0){
-            
+        if (((k+1) % NPRINTSKIP == 0)|| k==0){
             //kinetic energy
             K=0;
             K_t=0;
@@ -3387,11 +3383,6 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             
             if ((k+1) % (NPRINTSKIP*10) == 0) {
                 printTumorInterface(t);
-                //annealing
-                if ((k+1) % (NPRINTSKIP*10*100) == 0) {
-                    for (int i = 0; i < vertDOF; i++)
-                        v[i] *= 0.9;
-                }
             }
         }
     }
