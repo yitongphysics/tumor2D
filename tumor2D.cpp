@@ -911,14 +911,18 @@ void tumor2D::initializeTumorInterfacePositions(double phi0, double Ftol, double
 
     // initialize tumor cell centers in left-hand partition of the box
     for (ci=0; ci<tN; ci++){
-        dpos.at(NDIM*ci)         = (Ldiv - 2.0*drad[ci])*drand48() + drad[ci];
+        //dpos.at(NDIM*ci)         = (Ldiv - 2.0*drad[ci])*drand48() + drad[ci];
+        //randomly
+        dpos.at(NDIM*ci)     = L[0]*drand48();
         dpos.at(NDIM*ci + 1)     = L[1]*drand48();
     }
 
     // initialize WAT cell centers to the right
     for (ci=tN; ci<NCELLS; ci++){
-        dpos.at(NDIM*ci)         = (L[0] - Ldiv - 2.0*drad[ci])*drand48() + Ldiv + drad[ci];
-        dpos.at(NDIM*ci + 1)     = L[1]*drand48();
+        //dpos.at(NDIM*ci)         = (L[0] - Ldiv - 2.0*drad[ci])*drand48() + Ldiv + drad[ci];
+        //dpos.at(NDIM*ci + 1)     = L[1]*drand48();
+        dpos.at(NDIM*ci)         = ((ci-tN+1)%6)*L[0]/6.0+L[0]/12.0;
+        dpos.at(NDIM*ci + 1)     = ceil((ci-tN+1)/6.0)*L[1]/6.0-L[1]/12.0;
     }
 
     // set radii of SP disks
@@ -1081,11 +1085,13 @@ void tumor2D::initializeTumorInterfacePositions(double phi0, double Ftol, double
             if (ci < tN) {
                 if (xi < drad[ci])
                     dF[NDIM*ci] += (1.0 - (xi/drad[ci]))/drad[ci];
-                else if (xi > Ldiv - drad[ci])
+                //warning if (xi > Ldiv - drad[ci])
+                else if (xi > L[0] - drad[ci])
                     dF[NDIM*ci] -= (1.0 - ((Ldiv - xi)/drad[ci]))/drad[ci];
             }
             else {
-                if (xi < Ldiv + drad[ci])
+                //warning:if (xi < Ldiv + drad[ci])
+                if (xi < drad[ci])
                     dF[NDIM*ci] += (1.0 - ((xi - Ldiv)/drad[ci]))/drad[ci];
                 else if (xi > L[0] - drad[ci])
                     dF[NDIM*ci] -= (1.0 - ((L[0] - xi)/drad[ci]))/drad[ci];
@@ -1270,7 +1276,6 @@ void tumor2D::psiDiffusion(){
         // generate random variable
         r1 = drand48();
         r2 = drand48();
-        //grv is standard-norm-distributed: miu=0, sigma=1;
         grv = sqrt(-2.0*log(r1))*cos(2.0*PI*r2);
 
         // update director for cell ci
@@ -1653,6 +1658,11 @@ void tumor2D::updateECMAttachments(bool attach){
         com2D(ci,cx,cy);
         pinpos.at(NDIM*(ci-tN)) = cx;
         pinpos.at(NDIM*(ci-tN) + 1) = cy;
+    }
+    //fully mixed positions
+    for (ci=tN; ci<NCELLS; ci++){
+        pinpos.at(NDIM*(ci-tN)) = ((ci-tN+1)%6)*L[0]/6.0+L[0]/12.0;
+        pinpos.at(NDIM*(ci-tN) + 1) = ceil((ci-tN+1)/6.0)*L[1]/6.0-L[1]/12.0;
     }
 }
 
@@ -2479,11 +2489,13 @@ void tumor2D::repulsiveTumorInterfaceForceUpdate() {
     resetForcesAndEnergy();
     repulsiveTumorInterfaceForces();
     tumorShapeForces();
+    //warning
+    //adipocyteECMAdhesionForces();
 }
 
 void tumor2D::stickyTumorInterfaceForceUpdate() {
     resetForcesAndEnergy();
-    crawlerUpdate();
+    //crawlerUpdate();
     stickyTumorInterfaceForces();
     tumorShapeForces();
     //adipocyteECMAdhesionForces();
@@ -2549,7 +2561,7 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
             P += v[i] * F[i];
         //P += V_wall * (P0 - wpress[0])*L[1];
         // print to console
-        /*
+        
         if (fireit % NSKIP == 0) {
             cout << endl
                  << endl;
@@ -2570,7 +2582,7 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
             cout << "   ** phi      = " << vertexPreferredPackingFraction2D() << endl;
             //printTumorInterface(0);
         }
-        */
+        
 
         //cout << accumulate(F.begin(), F.end(), 1) << endl;
         //cout << vnorm << endl;
@@ -2702,7 +2714,7 @@ void tumor2D::tumorFIRE(tumor2DMemFn forceCall, double Ftol, double dt0) {
     if (fireit == itmax) {
         cout << "    ** FIRE minimization did not converge, fireit = " << fireit << ", itmax = " << itmax << "; ending." << endl;
         //warning
-        exit(1);
+        //exit(1);
     }
     else {
         /*
@@ -2794,11 +2806,12 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
 
     // initialize preferred packing fraction
     phi0 = vertexPreferredPackingFraction2D();
-
     // loop until pcheck > Ptol is found
     //warning
     //printTumorInterface(0.0);
-    while (pcheck < Ptol && k < itmax) {
+    //updateECMAttachments(1);
+    //pcheck < Ptol
+    while (phi0 <0.89 && k < itmax) {
         // relax configuration (pass repsulive force update member function)
         // scale particle sizes
         // update packing fraction
@@ -2849,7 +2862,7 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
         cout << endl << endl;
         
     
-        //printTumorInterface(0.0);
+        printTumorInterface(0.0);
         // update iterate
         k++;
     }
@@ -2870,7 +2883,7 @@ void tumor2D::tumorCompression(double Ftol, double Ptol, double dt0, double dphi
     }
     
     wpos = 0.0;
-    press_teller = 0;
+    press_teller = 1;
     while (press_teller ==0) {
         press_it += 1;
         // pbcs and reset forces
@@ -3068,6 +3081,10 @@ void tumor2D::invasion(tumor2DMemFn forceCall, double dDr, double dPsi, double D
 
 // invasion at constant pressure
 void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double g0, double dDr, double dPsi, double Drmin, int NT, int NPRINTSKIP){
+    
+    random_device rd;
+    mt19937 gen(rd());
+    normal_distribution<double> distribution(0.0, 1.0);
     // check correct setup
     setupCheck();
     
@@ -3090,9 +3107,16 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     double K=0.0;
     double K0= 0.0;
     double beta_K=0.0;
+    vector<double> r1;
+    vector<double> r2;
+    double sg = sqrt(2*B*v0);
     vector<int> tN_list;
 
 
+    for (gi=0; gi<NVTOT*NDIM; gi++){
+        r1.push_back(0.0);
+        r2.push_back(0.0);
+    }
     // attach pins
     updateECMAttachments(1);
     
@@ -3125,13 +3149,10 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     // initial pressure
     CALL_MEMBER_FN(*this, forceCall)();
 
-    //relexation and constant temperature simulations to get expected temperature
-    /*
     // relaxation : when change kb
     //tumorFIRE(&tumor2D::stickyTumorInterfaceForceUpdate, 1e-7, 5e-2);
     // RELAXATION: reach ground state by FIRE, considering pressure and stickyness.
-    press_teller = 0;
-    B=3.0;
+    press_teller = 1;
     //warning
     while (press_teller ==0) {
         press_it += 1;
@@ -3168,10 +3189,9 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             if (wpress[0] < 1.001* P0 && wpress[0] > 0.999* P0) {
                 press_teller = 1;
             }
-            //printTumorInterface(0.0);
+            printTumorInterface(0.0);
         }
     }
-    B=0.0;
     fill(contactTime.begin(),contactTime.end(),0);
 
     //compute H
@@ -3187,7 +3207,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         v[NDIM*gi] = v0*cos(2.0*PI*tN_list[gi]/NVTOT);
         v[NDIM*gi + 1] = v0*sin(2.0*PI*tN_list[gi]/NVTOT);
     }
-    printTumorInterface(t);
+    //printTumorInterface(t);
     //constant temperature simulation
     // temperature is fixed at some value. Strong damping on the wall.
     press_teller = 1;
@@ -3205,6 +3225,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             }
         }
         
+        /*******************************************************************************************************************************/
         // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
         for (i=0; i<NVTOT*NDIM; i++){
             x[i] += dt * (v[i] +dt/2.0/M * (F[i] -B*v[i]));
@@ -3273,17 +3294,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         for (int i = 0; i < vertDOF; i++)
             v[i] *= sqrt(K0/K);
     }
-     */
     //printTumorInterface(t);
-    
-    for (ci=0; ci<tN; ci++){
-        tN_list.push_back(ci);
-    }
-    random_shuffle (tN_list.begin(), tN_list.end());
-    for (ci=0; ci<tN; ci++){
-        psi[ci] = 2.0*PI*tN_list[ci]/tN;
-    }
-    printTumorInterface(t);
     for (k=0; k<NT; k++){
         // pbcs and reset forces
         for (i=0; i<vertDOF; i++){
@@ -3299,13 +3310,16 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         /*******************************************************************************************************************************/
         // update positions (Velocity Verlet, OVERDAMPED) & update velocity 1st term
         for (i=0; i<NVTOT*NDIM; i++){
-            x[i] += dt * (v[i] +dt/2.0/M * (F[i] -B*v[i]));
-            v[i] += dt/2.0/M * (F[i] -B*v[i]*  (1.0+1.0/(1.0+B/2.0*dt)));
+            r1[i] = distribution(gen);
+            r2[i] = distribution(gen);
+            
+            v[i] = v[i] + dt/2.0/M * F[i] -dt/2.0*B*v[i] + 1.0/2.0*sqrt(dt)*sg*r1[i] - 1.0/8.0*dt*dt*B*(F[i]/M-B*v[i]) - 1.0/4.0*pow(dt,1.5)*B*sg*(1.0/2.0*r1[i]+1.0/sqrt(3.0)*r2[i]);
+            x[i] += dt*v[i] + pow(dt,1.5)*sg/2.0/sqrt(3.0)*r2[i];
         }
-        wpos += dt*(V_wall + dt/2.0/M_wall*((P0 - wpress[0])*L[1]-B*V_wall));
-        V_wall += dt/2.0/M_wall * ((P0 - wpress[0])*L[1]-B*V_wall*(1.0+1.0/(1.0+B/2.0*dt)));
+        //wpos += dt*(V_wall + dt/2.0/M_wall*((P0 - wpress[0])*L[1]-B*V_wall));
+        //V_wall += dt/2.0/M_wall * ((P0 - wpress[0])*L[1]-B*V_wall*(1.0+1.0/(1.0+B/2.0*dt)));
         // update psi before update force
-        psiDiffusion();
+        //psiDiffusion();
         //psiECM();
         
         // sort particles
@@ -3313,6 +3327,8 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         neighborLinkedList2D();
         // update forces
         CALL_MEMBER_FN(*this, forceCall)();
+        
+        
         /*//Euler update
         for (i=0; i<vertDOF; i++){
             v[i] += dt * F[i]/M;
@@ -3323,8 +3339,9 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
          */
         // update velocity 2nd term (Velocity Verlet, OVERDAMPED)
         for (i=0; i<NVTOT*NDIM; i++)
-            v[i] += dt/2.0/M * F[i]/(1.0+B/2.0*dt);
-        V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
+            v[i] = v[i] + 1.0/2.0*dt/M*F[i] - 1.0/2.0*dt*B*v[i] + 1.0/2.0*sqrt(dt)*sg*r1[i] - 1.0/8.0*dt*dt*B*(F[i]/M - B*v[i]) - 1.0/4.0*pow(dt,1.5)*B*sg*(1.0/2.0*r1[i]+1.0/sqrt(3.0)*r2[i]);
+
+        //V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
 
         // update time
         t += dt;
@@ -3394,6 +3411,14 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             
             if ((k+1) % (NPRINTSKIP*10) == 0) {
                 printTumorInterface(t);
+                if ((k+1) % (NPRINTSKIP*500) == 0 && (k+1)<NT/2.0) {
+                    for (int i = 0; i < vertDOF; i++)
+                        v[i] *= 2.0;
+                }
+                else if((k+1) % (NPRINTSKIP*500) == 0 && (k+1)>NT/2.0) {
+                    for (int i = 0; i < vertDOF; i++)
+                        v[i] *= 0.5;
+                }
             }
         }
     }
