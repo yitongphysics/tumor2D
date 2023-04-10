@@ -3113,7 +3113,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
     vector<int> tN_list;
 
 
-    for (gi=0; gi<NVTOT*NDIM; gi++){
+    for (gi=0; gi<NVTOT*NDIM+1; gi++){
         r1.push_back(0.0);
         r2.push_back(0.0);
     }
@@ -3313,9 +3313,13 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
             r1[i] = distribution(gen);
             r2[i] = distribution(gen);
             
-            v[i] = v[i] + dt/2.0/M * F[i] -dt/2.0*B*v[i] + 1.0/2.0*sqrt(dt)*sg*r1[i] - 1.0/8.0*dt*dt*B*(F[i]/M-B*v[i]) - 1.0/4.0*pow(dt,1.5)*B*sg*(1.0/2.0*r1[i]+1.0/sqrt(3.0)*r2[i]);
+            v[i] = v[i] + dt/2.0/M*F[i] -dt/2.0*B*v[i] + 1.0/2.0*sqrt(dt)*sg*r1[i] - 1.0/8.0*dt*dt*B*(F[i]/M-B*v[i]) - 1.0/4.0*pow(dt,1.5)*B*sg*(1.0/2.0*r1[i]+1.0/sqrt(3.0)*r2[i]);
             x[i] += dt*v[i] + pow(dt,1.5)*sg/2.0/sqrt(3.0)*r2[i];
         }
+        r1.back() = distribution(gen);
+        r2.back() = distribution(gen);
+        V_wall = V_wall + dt/2.0/M_wall*(P0-wpress[0])*L[1] -dt/2.0*B*V_wall + 1.0/2.0*sqrt(dt)*sg/sqrt(M_wall)*r1.back() - 1.0/8.0*dt*dt*B*((P0-wpress[0])*L[1]/M_wall-B*V_wall) - 1.0/4.0*pow(dt,1.5)*B*sg/sqrt(M_wall)*(1.0/2.0*r1.back()+1.0/sqrt(3.0)*r2.back());
+        wpos += dt*V_wall + pow(dt,1.5)*sg/sqrt(M_wall)/2.0/sqrt(3.0)*r2.back();
         //wpos += dt*(V_wall + dt/2.0/M_wall*((P0 - wpress[0])*L[1]-B*V_wall));
         //V_wall += dt/2.0/M_wall * ((P0 - wpress[0])*L[1]-B*V_wall*(1.0+1.0/(1.0+B/2.0*dt)));
         // update psi before update force
@@ -3340,8 +3344,7 @@ void tumor2D::invasionConstP(tumor2DMemFn forceCall, double M, double P0, double
         // update velocity 2nd term (Velocity Verlet, OVERDAMPED)
         for (i=0; i<NVTOT*NDIM; i++)
             v[i] = v[i] + 1.0/2.0*dt/M*F[i] - 1.0/2.0*dt*B*v[i] + 1.0/2.0*sqrt(dt)*sg*r1[i] - 1.0/8.0*dt*dt*B*(F[i]/M - B*v[i]) - 1.0/4.0*pow(dt,1.5)*B*sg*(1.0/2.0*r1[i]+1.0/sqrt(3.0)*r2[i]);
-
-        //V_wall += dt/2.0/M_wall * (P0 - wpress[0])*L[1] / (1.0+B/2.0*dt);
+        V_wall = V_wall + dt/2.0/M_wall*(P0-wpress[0])*L[1] -dt/2.0*B*V_wall + 1.0/2.0*sqrt(dt)*sg/sqrt(M_wall)*r1.back() - 1.0/8.0*dt*dt*B*((P0-wpress[0])*L[1]/M_wall-B*V_wall) - 1.0/4.0*pow(dt,1.5)*B*sg/sqrt(M_wall)*(1.0/2.0*r1.back()+1.0/sqrt(3.0)*r2.back());
 
         // update time
         t += dt;
