@@ -23,13 +23,10 @@ protected:
     double wpos;
     
     // motility parameters
-    double v0, Dr0, Ds, tau, rho0, rhot;
+    double v0, f0, Dr0, Ds, tau, rho0, rhot;
     std::vector<double> psi;
     std::vector<double> Dr;
 
-    //repulsion between particles
-    std::vector<double> F_ij;
-    std::vector<int> contactTime;
     // parameters to pin adipocytes
     double kecm, ecmbreak;
     std::vector<double> pinpos;
@@ -50,8 +47,7 @@ public:
     void setgamtt(double val) { gamtt = val; };
     void setv0(double val) { v0 = val; };
     void setDr0(double val) { Dr0 = val; };
-    void setDs(double val) { Ds = val; };
-    void settau(double val) { tau = val; };
+    void setf0(double val) { f0 = val; };
     void setkecm(double val) { kecm = val; };
     void setecmbreak(double val) { ecmbreak = val; };
     void reCellList3D(double boxLengthScale);
@@ -62,7 +58,8 @@ public:
     void initializeTumorInterfacePositions(double phi0, double Ftol, double prt, double aspectRatio);
 
     // biology functions
-    void psiDiffusion();
+    void initializePsi();
+    void psiDiffusion(int seed);
     void crawlerUpdate();
 
     // force updates
@@ -79,7 +76,7 @@ public:
     // protocols
     void setupCheck();
     void tumorCompression(double Ftol, double Ptol, double dt0, double dphi0);
-    void invasionConstP(tumor3DMemFn forceCall, double M, double P0, double g0, double dDr, double dPsi, double Drmin, int NT, int NPRINTSKIP);
+    void invasionConstP(tumor3DMemFn forceCall, double M, double P0, double g0, int NT, int NPRINTSKIP);
 
     // print functions
     void printTumorInterface(double t);

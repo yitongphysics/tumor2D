@@ -141,6 +141,12 @@ public:
 	// File openers
 	void openPosObject(std::string &str)
 	{
+        std::ifstream my_file(str.c_str());
+        if (my_file)
+        {
+            std::cout << "Position file already exits. Exit." << std::endl;
+            exit(-1);
+        }
 		posout.open(str.c_str());
 		if (!posout.is_open()) {
 			std::cerr << "	ERROR: posout could not open " << str << "..." << std::endl;
